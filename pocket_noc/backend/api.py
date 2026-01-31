@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -32,6 +33,13 @@ from capacity import (
 
 app = FastAPI(title="Pocket NOC - Fronthaul Digital Twin API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.get("/")
+def root():
+    """Redirect to API docs."""
+    return RedirectResponse(url="/docs", status_code=302)
+
 
 # Cached state (loaded at startup)
 _state = {}
