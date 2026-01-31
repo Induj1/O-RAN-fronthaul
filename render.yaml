@@ -1,0 +1,20 @@
+# Render Blueprint - Pocket NOC Backend
+# Deploy: Push to GitHub, then New Blueprint at https://render.com or use Deploy button in README.
+
+services:
+  - type: web
+    name: pocket-noc-api
+    runtime: python
+    plan: free
+    region: oregon
+
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn pocket_noc.backend.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Optional: set DATA_DIR to /opt/render/project/src/data if you add hackathon data
+      # - key: DATA_DIR
+      #   value: /opt/render/project/src/data

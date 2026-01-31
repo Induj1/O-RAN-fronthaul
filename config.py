@@ -1,10 +1,13 @@
 """Configuration for O-RAN fronthaul optimization analysis."""
 
+import os
 from pathlib import Path
 
-# Data paths
-DATA_DIR = Path(r"C:\Users\induj\Downloads\drive-download-20260131T064638Z-3-001")
-OUTPUT_DIR = Path(__file__).parent / "output"
+# Data paths: use DATA_DIR env var, or default to ./data (relative to project root)
+_PROJECT_ROOT = Path(__file__).resolve().parent
+_data_env = os.environ.get("DATA_DIR")
+DATA_DIR = Path(_data_env) if _data_env else _PROJECT_ROOT / "data"
+OUTPUT_DIR = _PROJECT_ROOT / "output"
 
 # O-RAN timing constants
 SYMBOL_DURATION_US = 500 / 14  # ~35.7 µs
