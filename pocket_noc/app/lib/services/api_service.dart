@@ -7,7 +7,7 @@ class ApiService {
   // Production: set to your Render URL, e.g. https://pocket-noc-api.onrender.com
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'https://o-ran-fronthaul.onrender.com',
   );
 
   static String getBaseUrl() => baseUrl;
