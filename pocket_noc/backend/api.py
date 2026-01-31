@@ -32,7 +32,14 @@ from capacity import (
 )
 
 app = FastAPI(title="Pocket NOC - Fronthaul Digital Twin API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 
 @app.get("/")
@@ -73,7 +80,6 @@ def _to_api_format(data: dict) -> dict:
         "congestion_fingerprint": {},
         "correlation_matrix": data.get("correlation_matrix"),
         "loss_correlation_over_time": data.get("loss_correlation_over_time", {}),
-        "_fallback": True,
     }
 
 
