@@ -15,6 +15,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      # Optional: set DATA_DIR to /opt/render/project/src/data if you add hackathon data
-      # - key: DATA_DIR
-      #   value: /opt/render/project/src/data

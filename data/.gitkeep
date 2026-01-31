@@ -1,2 +1,1 @@
-# Copy hackathon data (throughput-cell-*.dat, pkt-stats-cell-*.dat) here for full API + simulations.
-# Without data, the API serves precomputed output/results.json (read-only, no simulate).
+# Backend uses output/results.json instead of .dat files
