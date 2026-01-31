@@ -27,3 +27,7 @@ TOPOLOGY_ANCHORS = {1: 2, 2: 3}  # cell_id -> link_id
 
 # Limit analysis window (problem asks 60 sec for graphs)
 CAPACITY_TIME_WINDOW_SEC = 60
+
+# When set (e.g. RENDER_LIGHT_MODE=1), limit rows per file to fit 512MB
+RENDER_LIGHT_MODE = os.environ.get("RENDER_LIGHT_MODE", "").lower() in ("1", "true", "yes")
+MAX_ROWS_LIGHT = 200_000  # ~7 sec of symbol data per cell, fits 512MB

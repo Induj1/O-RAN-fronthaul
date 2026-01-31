@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from config import DATA_DIR, SYMBOL_DURATION_US, SLOT_DURATION_US
+from config import DATA_DIR, SYMBOL_DURATION_US, SLOT_DURATION_US, RENDER_LIGHT_MODE, MAX_ROWS_LIGHT
 
 
 def load_throughput(cell_id: int, data_dir: Path = DATA_DIR) -> pd.DataFrame:
@@ -17,9 +17,11 @@ def load_throughput(cell_id: int, data_dir: Path = DATA_DIR) -> pd.DataFrame:
     Load and preprocess throughput data for a cell.
     - Sort by timestamp
     - Replace measurement outliers (unusually high bits) with 0
+    - In RENDER_LIGHT_MODE, limit rows to fit 512MB
     """
     path = data_dir / f"throughput-cell-{cell_id}.dat"
-    df = pd.read_csv(path, sep=r"\s+", header=None, names=["timestamp", "bits_kbit"])
+    nrows = MAX_ROWS_LIGHT if RENDER_LIGHT_MODE else None
+    df = pd.read_csv(path, sep=r"\s+", header=None, names=["timestamp", "bits_kbit"], nrows=nrows)
     df = df.sort_values("timestamp").reset_index(drop=True)
 
     # Outlier removal: symbols with unusually high bits are measurement errors
@@ -37,9 +39,11 @@ def load_pkt_stats(cell_id: int, data_dir: Path = DATA_DIR) -> pd.DataFrame:
     Format: timestamp (slotStart), txPackets, rxPackets, tooLateRxPackets
     """
     path = data_dir / f"pkt-stats-cell-{cell_id}.dat"
+    nrows = (MAX_ROWS_LIGHT // 14) if RENDER_LIGHT_MODE else None  # ~14 symbols/slot
     df = pd.read_csv(
         path, sep=r"\s+", header=None, skiprows=1,
-        names=["timestamp", "tx_packets", "rx_packets", "too_late_rx"]
+        names=["timestamp", "tx_packets", "rx_packets", "too_late_rx"],
+        nrows=nrows,
     )
     df = df.sort_values("timestamp").reset_index(drop=True)
     df["lost_packets"] = df["tx_packets"] - df["rx_packets"] + df["too_late_rx"]

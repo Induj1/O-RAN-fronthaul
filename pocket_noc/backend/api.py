@@ -139,13 +139,71 @@ def get_results():
     return {"error": "No data loaded. Add output/results.json and redeploy."}
 
 
+def _simulate_from_json(multipliers: dict) -> dict:
+    """
+    Approximate What-If: scale per-link capacity by traffic multipliers.
+    Assumes equal per-cell contribution on each link.
+    """
+    topology = _state.get("topology", {})
+    cap_no = _state.get("cap_no_buf", {})
+    cap_with = _state.get("cap_with_buf", {})
+    base = _state.get("static_response", {})
+    if not base or not topology:
+        return None
+    mults = multipliers or {}
+    new_cap_no = {}
+    new_cap_with = {}
+    for link_id, cells in topology.items():
+        nb = cap_no.get(link_id, 0)
+        wb = cap_with.get(link_id, 0)
+        n = len(cells) if cells else 1
+        scale = 1.0
+        for cid in cells:
+            m = mults.get(str(cid), mults.get(cid, 1.0))
+            scale += (float(m) - 1.0) / n
+        new_cap_no[link_id] = round(nb * scale, 2)
+        new_cap_with[link_id] = round(wb * scale, 2)
+    reduction = {
+        k: int(100 * (1 - new_cap_with[k] / new_cap_no[k])) if new_cap_no.get(k, 0) > 0 else 22
+        for k in new_cap_no
+    }
+    risk = {
+        str(k): {"score": 0, "reason": "Simulated (approximate from multipliers)"}
+        for k in new_cap_no
+    }
+    recs = {
+        str(k): [f"Simulated: {new_cap_no.get(k, 0):.1f} → {new_cap_with.get(k, 0):.1f} Gbps (no buffer → with buffer)"]
+        for k in new_cap_no
+    }
+    return {
+        "topology": base.get("topology", {}),
+        "capacity_no_buf": {str(k): v for k, v in new_cap_no.items()},
+        "capacity_with_buf": {str(k): v for k, v in new_cap_with.items()},
+        "bandwidth_savings_pct": reduction,
+        "risk_scores": risk,
+        "recommendations": recs,
+        "topology_confidence": base.get("topology_confidence", {}),
+        "root_cause_attribution": base.get("root_cause_attribution", {}),
+        "outliers": base.get("outliers", []),
+        "traffic_summary": base.get("traffic_summary", {}),
+        "congestion_fingerprint": base.get("congestion_fingerprint", {}),
+        "correlation_matrix": base.get("correlation_matrix"),
+        "loss_correlation_over_time": base.get("loss_correlation_over_time", {}),
+    }
+
+
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
-    """What-If simulations require raw .dat data. Not available in JSON-only mode."""
-    raise HTTPException(
-        400,
-        "JSON-only mode: What-If simulations require raw throughput/pkt-stats .dat files. Run the backend locally with data for simulations.",
-    )
+    """What-If: scale capacity by traffic multipliers (approximate, no .dat required)."""
+    mults = req.traffic_multipliers or {}
+    if not mults:
+        if _state.get("static_response"):
+            return _state["static_response"]
+        return {"error": "No multipliers provided"}
+    result = _simulate_from_json(mults)
+    if result is None:
+        raise HTTPException(503, "No baseline data loaded.")
+    return result
 
 
 if __name__ == "__main__":
