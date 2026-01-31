@@ -131,15 +131,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         actions: [
           if (_usedFallback)
-            Container(
-              margin: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.warning.withOpacity(0.5)),
+            Tooltip(
+              message: 'Backend unreachable. Pull down or tap refresh to retry (Render may be waking up)',
+              child: Container(
+                margin: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.warning.withOpacity(0.5)),
+                ),
+                child: const Text('Demo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.warning)),
               ),
-              child: const Text('Demo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.warning)),
             ),
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _load),
           IconButton(icon: const Icon(Icons.share_rounded), onPressed: _data != null ? _shareReport : null),
@@ -520,8 +523,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   builder: (ctx, box) {
                                     final w = box.maxWidth;
                                     final n = vals.length;
-                                    final barW = (w / n).clamp(1.0, 6.0);
-                                    return Row(
+                                    final barW = (w / n).clamp(1.0, 5.0);
+                                    final row = Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: List.generate(n, (j) {
                                         final h = maxV > 0 ? (vals[j] / maxV * 10).clamp(1.0, 10.0) : 1.0;
@@ -532,6 +536,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                                           decoration: BoxDecoration(color: colors[i % colors.length], borderRadius: BorderRadius.circular(1)),
                                         );
                                       }),
+                                    );
+                                    final totalW = n * barW + n;
+                                    if (totalW <= w) return row;
+                                    return SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: row,
                                     );
                                   },
                                 ),
@@ -722,22 +732,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                       final w = box.maxWidth;
                       final n = ts.demandGbps.length;
                       if (n == 0) return const SizedBox();
-                      final barW = (w / n).clamp(2.0, 12.0);
+                      final barW = (w / n).clamp(2.0, 8.0);
                       final maxVal = maxD > 0 ? maxD * 1.1 : 1.0;
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: List.generate(n, (i) {
-                          final h = maxVal > 0 ? (ts.demandGbps[i] / maxVal * 40).clamp(2.0, 40.0) : 2.0;
-                          return Container(
-                            width: barW,
-                            height: h,
-                            margin: EdgeInsets.only(right: barW > 4 ? 1 : 0),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(1),
-                            ),
-                          );
-                        }),
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: List.generate(n, (i) {
+                            final h = maxVal > 0 ? (ts.demandGbps[i] / maxVal * 40).clamp(2.0, 40.0) : 2.0;
+                            return Container(
+                              width: barW,
+                              height: h,
+                              margin: EdgeInsets.only(right: barW > 4 ? 1 : 0),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            );
+                          }),
+                        ),
                       );
                     },
                   ),

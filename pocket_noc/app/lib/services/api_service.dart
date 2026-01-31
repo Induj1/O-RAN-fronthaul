@@ -13,10 +13,12 @@ class ApiService {
   static String getBaseUrl() => baseUrl;
 
   /// Try API first, then fallback to bundled static JSON when unreachable.
+  /// Timeout 60s: Render free tier cold start can take 30-60s after inactivity.
   Future<Map<String, dynamic>?> getResults() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/results')).timeout(
-        const Duration(seconds: 5),
+      final url = '$baseUrl/results';
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 60),
         onTimeout: () => throw Exception('timeout'),
       );
       if (response.statusCode == 200) {
@@ -38,6 +40,8 @@ class ApiService {
     return null;
   }
 
+  /// Returns result on success, or null on failure.
+  /// On 400: backend is in static mode (no raw data for simulations).
   Future<Map<String, dynamic>?> simulate(Map<String, double> trafficMultipliers) async {
     try {
       final body = jsonEncode({
@@ -49,9 +53,13 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: body,
           )
-          .timeout(const Duration(seconds: 10), onTimeout: () => throw Exception('timeout'));
+          .timeout(const Duration(seconds: 60), onTimeout: () => throw Exception('timeout'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      // 400 = static mode (Render deploy without raw data)
+      if (response.statusCode == 400) {
+        return null; // Caller will show "simulations not available" message
       }
     } catch (_) {}
     return null;

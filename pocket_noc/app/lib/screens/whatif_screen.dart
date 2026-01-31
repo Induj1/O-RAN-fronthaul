@@ -60,6 +60,15 @@ class _WhatIfScreenState extends State<WhatIfScreen> {
       _result = data;
       _loading = false;
     });
+    if (data == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Simulations require raw data. This deployment uses precomputed results—What-If is read-only.'),
+          backgroundColor: AppTheme.warning,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<void> _shareResult() async {
