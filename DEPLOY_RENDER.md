@@ -36,6 +36,16 @@
 
 ---
 
+## AI Chat (optional)
+
+To enable the in-app AI assistant, add in Render Dashboard → Environment:
+
+- `OPENAI_API_KEY` = your OpenAI API key (from platform.openai.com)
+
+Without it, the `/chat` endpoint returns 503. The app shows a fallback message.
+
+---
+
 ## Connect Flutter App
 
 **Option A – Build with API URL:**
@@ -52,5 +62,6 @@ flutter build web --dart-define=API_BASE_URL=https://YOUR-SERVICE.onrender.com
 - `GET /` – Redirect to docs
 - `GET /health` – Health check
 - `GET /results` – Fronthaul results (topology, capacity, risk, etc.)
-- `POST /simulate` – What-If simulation (requires raw data)
+- `POST /simulate` – What-If simulation (approximate, no .dat required)
+- `POST /chat` – AI assistant (requires `OPENAI_API_KEY`)
 - `GET /docs` – Swagger UI

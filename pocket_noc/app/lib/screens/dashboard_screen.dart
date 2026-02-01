@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:pocket_noc/models/fronthaul_data.dart';
 import 'package:pocket_noc/services/api_service.dart';
 import 'package:pocket_noc/screens/whatif_screen.dart';
+import 'package:pocket_noc/screens/chat_screen.dart';
 import 'package:pocket_noc/theme/app_theme.dart';
 import 'package:pocket_noc/widgets/section_card.dart';
 import 'package:pocket_noc/widgets/skeleton_loader.dart';
@@ -45,6 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  bool _retryScheduled = false;
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -52,16 +55,34 @@ class _DashboardScreenState extends State<DashboardScreen>
       _usedFallback = false;
     });
     final json = await _api.getResults();
+    if (!mounted) return;
     if (json != null && json['error'] == null) {
+      final usedFallback = json['_fallback'] == true;
       setState(() {
         _data = FronthaulData.fromJson(json);
         _loading = false;
-        _usedFallback = json['_fallback'] == true;
+        _usedFallback = usedFallback;
       });
       _animController.forward();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) _scrollController.jumpTo(0);
       });
+      if (usedFallback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Backend unreachable. Pull down or tap refresh to retry (Render free tier may take 60s to wake).'),
+            backgroundColor: AppTheme.warning,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        if (!_retryScheduled) {
+          _retryScheduled = true;
+          Future.delayed(const Duration(seconds: 25), () {
+            if (mounted && _usedFallback) _load();
+            _retryScheduled = false;
+          });
+        }
+      }
     } else {
       setState(() {
         _error = json?['error'] ?? 'Could not connect to API.';
@@ -132,18 +153,31 @@ class _DashboardScreenState extends State<DashboardScreen>
         actions: [
           if (_usedFallback)
             Tooltip(
-              message: 'Backend unreachable. Pull down or tap refresh to retry (Render may be waking up)',
-              child: Container(
-                margin: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.warning.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.warning.withOpacity(0.5)),
+              message: 'Tap to retry backend connection',
+              child: GestureDetector(
+                onTap: _load,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.warning.withOpacity(0.5)),
+                  ),
+                  child: const Text('Demo • Tap to retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.warning)),
                 ),
-                child: const Text('Demo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.warning)),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            tooltip: 'AI Assistant',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(data: _data),
+              ),
+            ),
+          ),
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _load),
           IconButton(icon: const Icon(Icons.share_rounded), onPressed: _data != null ? _shareReport : null),
           IconButton(

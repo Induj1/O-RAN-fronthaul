@@ -131,6 +131,117 @@ class SimulateRequest(BaseModel):
     traffic_multipliers: Optional[dict] = None
 
 
+class ChatRequest(BaseModel):
+    message: str
+    context: Optional[dict] = None
+
+
+def _build_chat_system_prompt(ctx: Optional[dict]) -> str:
+    """Build system prompt from live data or use default context."""
+    base = """You are an AI assistant for the O-RAN Fronthaul Optimizer, a network analysis dashboard for telecom operators.
+
+You help users understand:
+- Network topology and cell-to-link mappings
+- Capacity planning and buffer impacts
+- Congestion root causes and which cells contribute most
+- Optimization recommendations
+- What-if scenario analysis
+
+Keep responses concise, technical but accessible. Use specific data from the context when answering questions."""
+
+    if not ctx:
+        return base + """
+
+You have access to the following network data context:
+
+TOPOLOGY:
+- Link 1: Cell 4 (67% confidence)
+- Link 2: Cells 1, 3, 5, 9, 11, 12, 14, 17, 20, 21, 22 (61% confidence)
+- Link 3: Cells 2, 6, 7, 8, 10, 13, 15, 16, 18, 19, 23, 24 (87% confidence)
+
+CAPACITIES:
+- Link 1: 6.77 Gbps (no buffer) / 5.27 Gbps (with buffer)
+- Link 2: 31.05 Gbps (no buffer) / 24.16 Gbps (with buffer)
+- Link 3: 56.57 Gbps (no buffer) / 44.00 Gbps (with buffer)
+
+BANDWIDTH SAVINGS: All links show 22% potential savings through statistical multiplexing.
+
+ROOT CAUSE ATTRIBUTION (congestion events):
+- Link 1: Cell 4 contributing 100%
+- Link 2: top contributors are Cells 1, 5, 9, 12, 14, 20
+- Link 3: top contributors are Cells 2, 8, 10, 15, 19, 23"""
+
+    # Build from live context
+    topo = ctx.get("topology", {})
+    cap_no = ctx.get("capacity_no_buf", {})
+    cap_with = ctx.get("capacity_with_buf", {})
+    conf = ctx.get("topology_confidence", {})
+    sav = ctx.get("bandwidth_savings_pct", {})
+    rca = ctx.get("root_cause_attribution", {})
+
+    lines = [base, "\n\nCurrent network data:", "\nTOPOLOGY:"]
+    for lid, cells in topo.items():
+        c = conf.get(lid, 0)
+        cells_str = ", ".join(str(c) for c in cells) if isinstance(cells, list) else str(cells)
+        lines.append(f"- Link {lid}: {cells_str} ({c}% confidence)")
+
+    lines.append("\nCAPACITIES:")
+    for lid in sorted(cap_no.keys(), key=lambda x: (isinstance(x, str) and x.isdigit()) and int(x) or 0):
+        nb = cap_no.get(lid, 0)
+        wb = cap_with.get(lid, 0)
+        lines.append(f"- Link {lid}: {nb} Gbps (no buffer) / {wb} Gbps (with buffer)")
+
+    if sav:
+        lines.append(f"\nBANDWIDTH SAVINGS: {sav}")
+
+    if rca:
+        lines.append("\nROOT CAUSE ATTRIBUTION:")
+        for lid, events in rca.items():
+            if events and isinstance(events, list):
+                ev = events[0] if events else {}
+                contribs = ev.get("contributors", [])[:3]
+                contrib_str = ", ".join(f"Cell {c.get('cell_id')} ({c.get('pct', 0):.0f}%)" for c in contribs)
+                lines.append(f"- Link {lid}: {contrib_str}")
+
+    return "\n".join(lines)
+
+
+@app.post("/chat")
+def chat(req: ChatRequest):
+    """AI chat using OpenAI. Requires OPENAI_API_KEY env var."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(503, "OpenAI API key not configured. Set OPENAI_API_KEY in Render env vars.")
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        ctx = req.context or {}
+        if not ctx and _state.get("static_response"):
+            resp = _state["static_response"]
+            ctx = {
+                "topology": resp.get("topology", {}),
+                "capacity_no_buf": resp.get("capacity_no_buf", {}),
+                "capacity_with_buf": resp.get("capacity_with_buf", {}),
+                "topology_confidence": resp.get("topology_confidence", {}),
+                "bandwidth_savings_pct": resp.get("bandwidth_savings_pct", {}),
+                "root_cause_attribution": resp.get("root_cause_attribution", {}),
+            }
+        system = _build_chat_system_prompt(ctx)
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": req.message},
+            ],
+            max_tokens=500,
+        )
+        reply = completion.choices[0].message.content or "No response."
+        return {"reply": reply}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.get("/results")
 def get_results():
     """Get precomputed fronthaul results."""
